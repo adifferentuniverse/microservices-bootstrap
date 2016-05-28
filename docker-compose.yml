@@ -1,0 +1,89 @@
+consul:
+  container_name: consul
+  container_name: consul
+  image: gliderlabs/consul-server:latest
+  ports:
+    - "8300"
+    - "8400"
+    - "8500:8500"
+    - "53"
+  environment:
+    SERVICE_53_IGNORE: 'yes'
+    SERVICE_8300_IGNORE: 'yes'
+    SERVICE_8301_IGNORE: 'yes'
+    SERVICE_8302_IGNORE: 'yes'
+    SERVICE_8400_IGNORE: 'yes'
+    SERVICE_8600_IGNORE: 'yes'
+    SERVICE_8500_NAME: 'consul-admin_infra'
+  command: -server -bootstrap
+
+# Exactly one per physical node
+registrator:
+  container_name: registrator
+  container_name: registrator
+  image: gliderlabs/registrator:latest
+  volumes:
+    - "/var/run/docker.sock:/tmp/docker.sock"
+  links:
+    - consul
+  command: "-internal consul://consul:8500"
+
+elasticsearch:
+  container_name: elasticsearch
+  image: elasticsearch
+  volumes:
+    - /mnt/es-data:/usr/share/elasticsearch/data
+  ports:
+    - 9200:9200
+    - 9300:9300
+  command: elasticsearch -Des.network.host=0.0.0.0
+
+kibana:
+  container_name: kibana
+  build: lib/kibana/
+  volumes:
+    - ./lib/kibana/config/kibana.yml:/opt/kibana/config/kibana.yml
+  ports:
+    - '5601:5601'
+  links:
+    - elasticsearch
+
+fluentd:
+  container_name: fluentd
+  build: lib/fluentd/
+  volumes:
+    - /var/lib/docker/containers:/var/lib/docker/containers
+  ports:
+    - '24224:24224'
+  links:
+    - elasticsearch
+
+neutrino:
+  container_name: neutrino
+  hostname: localhost
+  build: lib/neutrino
+  volumes:
+    - /etc/neutrino:/etc/neutrino
+  net: "host"
+  ports:
+    - '9000:9000'
+    - '8079:8079'
+#  links:
+#    - fluentd
+#    - node_app
+  log_driver: 'fluentd'
+  log_opt:
+    fluentd-address: localhost:24224
+    fluentd-tag: docker.{{.FullID}}
+
+node_app:
+  container_name: app
+  build: lib/node_app/
+  ports:
+    - '8080:8080'
+  links:
+    - fluentd
+  log_driver: 'fluentd'
+  log_opt:
+    fluentd-address: localhost:24224
+    fluentd-tag: docker.{{.FullID}}
