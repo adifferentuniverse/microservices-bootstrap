@@ -17,7 +17,6 @@ consul:
     SERVICE_8500_NAME: 'consul-admin_infra'
   command: -server -bootstrap
 
-# Exactly one per physical node
 registrator:
   container_name: registrator
   container_name: registrator
@@ -68,9 +67,6 @@ neutrino:
   ports:
     - '9000:9000'
     - '8079:8079'
-#  links:
-#    - fluentd
-#    - node_app
   log_driver: 'fluentd'
   log_opt:
     fluentd-address: localhost:24224
@@ -87,3 +83,12 @@ node_app:
   log_opt:
     fluentd-address: localhost:24224
     fluentd-tag: docker.{{.FullID}}
+
+location-service-db:
+  build: lib/postgres/
+  ports:
+    - "5432:5432"
+  environment:
+    POSTGRES_USER: postgres
+    POSTGRES_PASSWORD: postgres
+    POSTGRES_DB: location-service
